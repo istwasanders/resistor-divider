@@ -173,19 +173,19 @@ int main(int argc, char *argv[])
 
     int optflag = 0;
 
-    while ((o = getopt_a(argc, argv, "i:o:s:r")) != -1)
+    while ((o = getopt(argc, argv, "i:o:s:r")) != -1)
         switch (o)
         {
         case 'i':
-            //vin = atof(optarg_a);
+            vin = atof(optarg);
             optflag |= (1 << 0);
             break;
         case 'o':
-            //vout = atof(optarg_a);
+            vout = atof(optarg);
             optflag |= (1 << 1);
             break;
         case 's':
-            //series = optarg_a;
+            series = optarg;
             optflag |= (1 << 2);
             break;
         case 'r':
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
         return 3;
     }
 
-    while (_strcmpi(series, serieses[series_index])) {
+    while (strcmp(series, serieses[series_index])) {
         series_index++;
         if(series_index > 4) break;
     }
