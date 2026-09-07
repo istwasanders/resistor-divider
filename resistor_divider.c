@@ -110,7 +110,7 @@ int target_index(int target, int* list, int list_len)
     return index;
 }
 
-struct res_calc calculate(double vi, double vo, int list_num)
+struct res_calc calculate(double vi, double vo, int list_num, int optflag)
 {
     double ratio;
     int norm_constant;
@@ -138,6 +138,9 @@ struct res_calc calculate(double vi, double vo, int list_num)
         r_target = target_index(r1, resistor_list, list_length);
         r_c[0] = resistor_list[r_target];
         r_c[1] = resistor_list[(r_target + 1) % list_length];
+        if(optflag & (1 << 3)){
+            printf("(%d, %d), %d\n",r_c[0],r_c[1],r2);
+        }
         if (fabs(norm(r_c[0], r2) - vn) < fabs(norm(r_n[0], r_n[1]) - vn)) {
             r_n[0] = r_c[0];
             r_n[1] = r2;
@@ -155,11 +158,12 @@ struct res_calc calculate(double vi, double vo, int list_num)
 
 void print_usage()
 {
-    printf("Usage: .\\resistor_divider.exe -i vin -o vout -s series [-r resistors]\n");
+    printf("Usage: .\\resistor_divider.exe -i vin -o vout [-s series] [-r resistors] [-v]\n");
     printf("    -i vin: Input voltage to the divider\n");
     printf("    -o vout: Output voltage from the divider\n");
-    printf("    -s series: Resistor series (E6, E12, E24, E48, E96, E192, or custom)\n");
+    printf("    -s series: Resistor series (E6, E12, E24, E48, E96, E192, or custom, default E96)\n");
     printf("    -r resistors: CSV file with list of custom resistances (NOT IMPLEMENTED)\n");
+    printf("    -v verbose: print all candidate dividers\n");
 }
 
 int main(int argc, char *argv[])
@@ -169,11 +173,11 @@ int main(int argc, char *argv[])
     int o;
     double vin = 0;
     double vout = 0;
-    char* series = "";
+    char* series = "E96";
 
     int optflag = 0;
 
-    while ((o = getopt(argc, argv, "i:o:s:r")) != -1)
+    while ((o = getopt(argc, argv, "vi:o:s:r:t:b")) != -1)
         switch (o)
         {
         case 'i':
@@ -190,6 +194,9 @@ int main(int argc, char *argv[])
             break;
         case 'r':
             break;
+        case 'v':
+            optflag |= (1 << 3);
+            break;
         case '?':
             print_usage();
             return 1;
@@ -200,7 +207,7 @@ int main(int argc, char *argv[])
     double error;
     double out_actual;
 
-    if (optflag != 7) {
+    if (optflag & 3 != 3) {
         print_usage();
         return 3;
     }
@@ -209,11 +216,11 @@ int main(int argc, char *argv[])
         series_index++;
         if(series_index > 4) break;
     }
-    if (vout >= vin) {
+    if (vout / vin > 1) {
         printf("Invalid vout to vin ratio\n");
         return -1;
     }
-    c = calculate(vin, vout, series_index);
+    c = calculate(vin, vout, series_index, optflag);
     if (c.r1 < c.r2) c.factor = c.factor + 1;
     correction = (int)pow(10.0, abs(c.factor));
     if (c.factor < 0) c.r2 = c.r2 * correction;
