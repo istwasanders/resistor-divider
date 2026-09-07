@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 
     int optflag = 0;
 
-    while ((o = getopt(argc, argv, "vi:o:s:r:t:b")) != -1)
+    while ((o = getopt(argc, argv, "vi:o:s:r:t:b:")) != -1)
         switch (o)
         {
         case 'i':
@@ -191,6 +191,12 @@ int main(int argc, char *argv[])
         case 's':
             series = optarg;
             optflag |= (1 << 2);
+            break;
+        case 't':
+            c.r1 = atoi(optarg);
+            break;
+        case 'b':
+            c.r2 = atoi(optarg);
             break;
         case 'r':
             break;
