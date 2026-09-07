@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
     double error;
     double out_actual;
 
-    if (optflag & 3 != 3) {
+    if ((optflag & 3) != 3) {
         print_usage();
         return 3;
     }
