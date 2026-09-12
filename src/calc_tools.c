@@ -24,7 +24,6 @@ int target_index(int target, int *list, int list_len){
     int middle;
     while(left <= right){
         middle = (left + right)/2;
-        printf("%d %d %d\n",left,middle,right);
         if((list[middle] <= target) && (list[middle+1]) > target) return middle;
         if(list[middle] < target) left = middle + 1;
         else right = middle - 1;
@@ -36,7 +35,7 @@ int target_index(int target, int *list, int list_len){
 // its proper position in the list
 void resistor_percolate(struct res_calc *divider_list, int list_len){
     struct res_calc temp;
-    list_len--;
+    //list_len--;
     while((list_len > 0) && (divider_list[list_len].rnorm < divider_list[list_len-1].rnorm)){
         // Swap divider positions
         temp = divider_list[list_len];

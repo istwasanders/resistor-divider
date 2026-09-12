@@ -15,7 +15,7 @@
 void calc(double vi, double vo, int list_num, int optflag, struct res_calc *results, int num_results){
   double ratio;
   int norm_constant;
-  double vn;
+  double norm_target;
   int r1, r2;
   int r_target;
   int r_c[2];
@@ -26,13 +26,38 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
 
   ratio = vi / vo - 1;
   norm_constant = (int)floor(log10(ratio));
-  vn = ratio / pow(10, norm_constant);
+  norm_target = ratio / pow(10, norm_constant);
 
   r_n[0] = 100;
   r_n[1] = 100;
-  printf("%d\n",list_num);
   if((results[0].r1 == 0) && (results[0].r2 == 0)){
     printf("A list of compatible R1s and R2s shall be compiled\n");
+    for(int i = 0; i < num_results+1; i++){
+      // Is it safe to assume this as an upper bound?
+      results[i].rnorm = 1e100;
+      results[i].factor = norm_constant;
+    }
+    for(int i = 0; i < list_length; i++){
+      results[num_results].r2 = resistor_list[i];
+
+      // Find the optimal r1 from the list given the current r2
+      int r1_target = (int)(results[num_results].r2 * norm_target);
+      if(r1_target >= 1000) r1_target = r1_target / 10;
+      int r1_target_index = target_index(r1_target, resistor_list, list_length);
+
+      // Optimal r1 will be either this index or the next index
+      // (Or the first index if "this index" is the last index)
+      // Percolate them both into the list
+      results[num_results].r1 = resistor_list[r1_target_index];
+      results[num_results].rnorm = 
+        fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
+      resistor_percolate(results,num_results);
+
+      results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
+      results[num_results].rnorm = 
+        fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
+      resistor_percolate(results,num_results);
+    }
   }
   else if(results[0].r1 == 0){
     printf("Only R1 shall be calculated\n");
@@ -119,8 +144,10 @@ int main(int argc, char *argv[])
   char* series = "E96";
 
   int optflag = 0;
+  int num_results = 1;
+  struct res_calc *results;
 
-  while ((o = getopt(argc, argv, "vi:o:s:r:t:b:")) != -1)
+  while ((o = getopt(argc, argv, "vi:o:s:r:t:b:n:")) != -1)
     switch (o)
     {
       case 'i':
@@ -142,6 +169,9 @@ int main(int argc, char *argv[])
       case 'b':
         c.r2 = atoi(optarg);
         c.r1 = 0;
+        break;
+      case 'n':
+        num_results = atoi(optarg);
         break;
       case 'r':
         break;
@@ -172,22 +202,23 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  calc(vin,vout,series_index,optflag,&c,1);
-  printf("%d\n%d\n",c.r1,c.r2);
-  return 0;
-  c = calculate(vin, vout, series_index, optflag);
-  if (c.r1 < c.r2) c.factor = c.factor + 1;
-  correction = (int)pow(10.0, abs(c.factor));
-  if (c.factor < 0) c.r2 = c.r2 * correction;
-  else c.r1 = c.r1 * correction;
-  out_actual = (vin * c.r2) / ((c.r1 + c.r2));
-  error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
-  printf("Vin: %.5g\n", vin);
-  printf("Vout: %.5g\n", vout);
-  printf("Series: %s\n", stdres_series_names[series_index]);
-  printf("R1: %d\n", c.r1);
-  printf("R2: %d\n", c.r2);
-  printf("Actual Output: %.7g\n", out_actual);
-  printf("Error: %.5g%%\n", error*100);
+  results = malloc((num_results + 1) * sizeof(struct res_calc));
+  if(results == NULL){
+    perror("allocating results");
+    return -1;
+  }
+
+  calc(vin,vout,series_index,optflag,results,num_results);
+  printf("|%11s|%11s|%11s|%11s|\n","R1","R2","Actual Out","Error");
+  for(int i = 0; i < num_results; i++){
+    c = results[i];
+    if (c.r1 < c.r2) c.factor = c.factor + 1;
+    correction = (int)pow(10.0, abs(c.factor));
+    if (c.factor < 0) c.r2 = c.r2 * correction;
+    else c.r1 = c.r1 * correction;
+    out_actual = (vin * c.r2) / ((c.r1 + c.r2));
+    error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
+    printf("|%11d|%11d|%11.5f|%10.05f%%|\n",c.r1,c.r2,out_actual,error*100);
+  }
   return 0;
 }
