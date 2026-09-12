@@ -6,6 +6,8 @@ struct res_calc {
   int r2;
   int factor;
   double rnorm;
+  double out;
+  double error;
 };
 
 #endif

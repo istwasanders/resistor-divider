@@ -13,45 +13,74 @@
 #include "resistor_calculator.h"
 
 void calc(double vi, double vo, int list_num, int optflag, struct res_calc *results, int num_results){
-  double ratio;
-  int norm_constant;
-  double norm_target;
   int r1, r2;
   int r_target;
 
   int* resistor_list = stdres_lists[list_num];
   int list_length = stdres_list_lengths[list_num];
 
-  ratio = vi / vo;
-  norm_constant = (int)floor(log10(ratio - 1));
-  norm_target = (ratio - 1) / pow(10, norm_constant);
+  double ratio = vi / vo;
+  int norm_constant = (int)floor(log10(ratio - 1));
+  double norm_target = (ratio - 1) / pow(10, norm_constant);
+  int correction = (int)pow(10.0,abs(norm_constant));
+  int correction_temp;
 
   if((results[0].r1 == 0) && (results[0].r2 == 0)){
     for(int i = 0; i < num_results+1; i++){
       // Is it safe to assume this as an upper bound?
-      results[i].rnorm = 1e100;
+      results[i].error = 1e100;
       results[i].factor = norm_constant;
     }
     for(int i = 0; i < list_length; i++){
-      results[num_results].r2 = resistor_list[i];
+      r2 = results[num_results].r2 = resistor_list[i];
 
       // Find the optimal r1 from the list given the current r2
       int r1_target = (int)(results[num_results].r2 * norm_target);
       if(r1_target >= 1000) r1_target = r1_target / 10;
       int r1_target_index = target_index(r1_target, resistor_list, list_length);
 
+/*
+if (c.r1 < c.r2) c.factor = c.factor + 1;
+    correction = (int)pow(10.0, abs(c.factor));
+    if (c.factor < 0) c.r2 = c.r2 * correction;
+    else c.r1 = c.r1 * correction;
+    out_actual = (vin * c.r2) / ((c.r1 + c.r2));
+    error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
+*/
+
       // Optimal r1 will be either this index or the next index
       // (Or the first index if "this index" is the last index)
       // Percolate them both into the list
-      results[num_results].r1 = resistor_list[r1_target_index];
-      results[num_results].rnorm = 
-        fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
+      r1 = results[num_results].r1 = resistor_list[r1_target_index];
+      
+      if(results[num_results].r1 < results[num_results].r2) correction_temp = correction*10;
+      else correction_temp = correction;
+
+      if(results[num_results].factor < 0) results[num_results].r2 *= correction_temp;
+      else results[num_results].r1 *= correction_temp;
+
+      results[num_results].out = vi*(results[num_results].r2)/
+        (results[num_results].r2 + results[num_results].r1);
+      
+      results[num_results].error = (results[num_results].out/vo)-1;
       resistor_percolate(results,num_results);
 
       results[num_results].r2 = resistor_list[i];
+      // results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
+      // results[num_results].rnorm = 
+      //   fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
+      // resistor_percolate(results,num_results);
       results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
-      results[num_results].rnorm = 
-        fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
+      if(results[num_results].r1 < results[num_results].r2) correction_temp = correction*10;
+      else correction_temp = correction;
+
+      if(results[num_results].factor < 0) results[num_results].r2 *= correction_temp;
+      else results[num_results].r1 *= correction_temp;
+
+      results[num_results].out = vi*(results[num_results].r2)/
+        (results[num_results].r2 + results[num_results].r1);
+      
+      results[num_results].error = (results[num_results].out/vo)-1;
       resistor_percolate(results,num_results);
     }
   }
@@ -206,13 +235,13 @@ int main(int argc, char *argv[])
   printf("%s,%s,%s,%s\n","R1","R2","Actual Out","Error");
   for(int i = 0; i < num_results; i++){
     c = results[i];
-    if (c.r1 < c.r2) c.factor = c.factor + 1;
-    correction = (int)pow(10.0, abs(c.factor));
-    if (c.factor < 0) c.r2 = c.r2 * correction;
-    else c.r1 = c.r1 * correction;
-    out_actual = (vin * c.r2) / ((c.r1 + c.r2));
-    error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
-    printf("%d,%d,%.5f,%.5f%%\n",c.r1,c.r2,out_actual,error*100);
+    // if (c.r1 < c.r2) c.factor = c.factor + 1;
+    // correction = (int)pow(10.0, abs(c.factor));
+    // if (c.factor < 0) c.r2 = c.r2 * correction;
+    // else c.r1 = c.r1 * correction;
+    // out_actual = (vin * c.r2) / ((c.r1 + c.r2));
+    // error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
+    printf("%d,%d,%.5f,%.5f%%\n",c.r1,c.r2,c.out,c.error*100);
   }
   return 0;
 }

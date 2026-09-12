@@ -36,7 +36,7 @@ int target_index(int target, int *list, int list_len){
 void resistor_percolate(struct res_calc *divider_list, int list_len){
     struct res_calc temp;
     //list_len--;
-    while((list_len > 0) && (divider_list[list_len].rnorm < divider_list[list_len-1].rnorm)){
+    while((list_len > 0) && (fabs(divider_list[list_len].error) < fabs(divider_list[list_len-1].error))){
         // Swap divider positions
         temp = divider_list[list_len];
         divider_list[list_len] = divider_list[list_len - 1];
