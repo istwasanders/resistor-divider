@@ -10,12 +10,7 @@
 #include "getopt.h"
 #include "standard_resistors.h"
 #include "calc_tools.h"
-
-struct res_calc {
-  int r1;
-  int r2;
-  int factor;
-};
+#include "resistor_calculator.h"
 
 void calc(double vi, double vo, int list_num, int optflag, struct res_calc *results, int num_results){
   double ratio;
