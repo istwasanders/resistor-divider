@@ -31,7 +31,6 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
   r_n[0] = 100;
   r_n[1] = 100;
   if((results[0].r1 == 0) && (results[0].r2 == 0)){
-    printf("A list of compatible R1s and R2s shall be compiled\n");
     for(int i = 0; i < num_results+1; i++){
       // Is it safe to assume this as an upper bound?
       results[i].rnorm = 1e100;
@@ -53,6 +52,7 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
         fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
       resistor_percolate(results,num_results);
 
+      results[num_results].r2 = resistor_list[i];
       results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
       results[num_results].rnorm = 
         fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
@@ -60,7 +60,6 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
     }
   }
   else if(results[0].r1 == 0){
-    printf("Only R1 shall be calculated\n");
     float r1_temp = ((vi/vo) - 1)*results[0].r2;
     int something = (int)floor(log10(r1_temp));
     int something_else = target_index((int)(r1_temp/pow(10,something-2)),resistor_list,list_length);
@@ -69,7 +68,6 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
     results[0].factor = 0;
   }
   else if(results[0].r2 == 0){
-    printf("Only R2 shall be calculated\n");
     r1 = results[0].r1;
     while(r1 >= 1000) r1 = r1 / 10;
     while(r1 < 100) r1 = r1 * 10;
@@ -193,6 +191,12 @@ int main(int argc, char *argv[])
     return 3;
   }
 
+  results = malloc((num_results + 1) * sizeof(struct res_calc));
+  if(results == NULL){
+    perror("allocating results");
+    return -1;
+  }
+  
   while (strcmp(series, stdres_series_names[series_index])) {
     series_index++;
     if(series_index > 4) break;
@@ -202,14 +206,8 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  results = malloc((num_results + 1) * sizeof(struct res_calc));
-  if(results == NULL){
-    perror("allocating results");
-    return -1;
-  }
-
   calc(vin,vout,series_index,optflag,results,num_results);
-  printf("|%11s|%11s|%11s|%11s|\n","R1","R2","Actual Out","Error");
+  printf("%s,%s,%s,%s\n","R1","R2","Actual Out","Error");
   for(int i = 0; i < num_results; i++){
     c = results[i];
     if (c.r1 < c.r2) c.factor = c.factor + 1;
@@ -218,7 +216,7 @@ int main(int argc, char *argv[])
     else c.r1 = c.r1 * correction;
     out_actual = (vin * c.r2) / ((c.r1 + c.r2));
     error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
-    printf("|%11d|%11d|%11.5f|%10.05f%%|\n",c.r1,c.r2,out_actual,error*100);
+    printf("%d,%d,%.5f,%.5f%%\n",c.r1,c.r2,out_actual,error*100);
   }
   return 0;
 }
