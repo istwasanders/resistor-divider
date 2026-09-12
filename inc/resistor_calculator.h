@@ -10,4 +10,15 @@ struct res_calc {
   double error;
 };
 
+enum res_calc_optflags{
+  RES_OPT_INPUT = 0,
+  RES_OPT_OUTPUT,
+  RES_OPT_SERIES,
+  RES_OPT_TOP,
+  RES_OPT_BOTTOM,
+  RES_OPT_GREATER,
+  RES_OPT_LESS,
+  RES_OPT_VERBOSE
+};
+
 #endif

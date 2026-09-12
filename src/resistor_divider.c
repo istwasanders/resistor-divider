@@ -39,15 +39,6 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
       if(r1_target >= 1000) r1_target = r1_target / 10;
       int r1_target_index = target_index(r1_target, resistor_list, list_length);
 
-/*
-if (c.r1 < c.r2) c.factor = c.factor + 1;
-    correction = (int)pow(10.0, abs(c.factor));
-    if (c.factor < 0) c.r2 = c.r2 * correction;
-    else c.r1 = c.r1 * correction;
-    out_actual = (vin * c.r2) / ((c.r1 + c.r2));
-    error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
-*/
-
       // Optimal r1 will be either this index or the next index
       // (Or the first index if "this index" is the last index)
       // Percolate them both into the list
@@ -63,13 +54,11 @@ if (c.r1 < c.r2) c.factor = c.factor + 1;
         (results[num_results].r2 + results[num_results].r1);
       
       results[num_results].error = (results[num_results].out/vo)-1;
-      resistor_percolate(results,num_results);
+      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (results[num_results].error <= 0) || 
+         ((optflag & (1 << RES_OPT_LESS)) == 0) && (results[num_results].error >= 0) )
+          resistor_percolate(results,num_results);
 
       results[num_results].r2 = resistor_list[i];
-      // results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
-      // results[num_results].rnorm = 
-      //   fabs(norm(results[num_results].r1, results[num_results].r2) - norm_target);
-      // resistor_percolate(results,num_results);
       results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
       if(results[num_results].r1 < results[num_results].r2) correction_temp = correction*10;
       else correction_temp = correction;
@@ -81,7 +70,9 @@ if (c.r1 < c.r2) c.factor = c.factor + 1;
         (results[num_results].r2 + results[num_results].r1);
       
       results[num_results].error = (results[num_results].out/vo)-1;
-      resistor_percolate(results,num_results);
+      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (results[num_results].error <= 0) || 
+         ((optflag & (1 << RES_OPT_LESS)) == 0) && (results[num_results].error >= 0) )
+          resistor_percolate(results,num_results);
     }
   }
   else if(results[0].r1 == 0){
@@ -129,7 +120,7 @@ struct res_calc calculate(double vi, double vo, int list_num, int optflag)
     r_target = target_index(r1, resistor_list, list_length);
     r_c[0] = resistor_list[r_target];
     r_c[1] = resistor_list[(r_target + 1) % list_length];
-    if(optflag & (1 << 3)){
+    if(optflag & (1 << RES_OPT_VERBOSE)){
       printf("(%d, %d), %d\n",r_c[0],r_c[1],r2);
     }
     if (fabs(norm(r_c[0], r2) - vn) < fabs(norm(r_n[0], r_n[1]) - vn)) {
@@ -149,12 +140,16 @@ struct res_calc calculate(double vi, double vo, int list_num, int optflag)
 
 void print_usage()
 {
-  printf("Usage: .\\resistor_divider.exe -i vin -o vout [-s series] [-r resistors] [-v]\n");
+  printf("Usage: .\\resistor_divider.exe -i vin -o vout [-s series] [-r resistors] [-t top] [-b bottom] [-vgl]\n");
   printf("    -i vin: Input voltage to the divider\n");
   printf("    -o vout: Output voltage from the divider\n");
   printf("    -s series: Resistor series (E6, E12, E24, E48, E96, E192, or custom, default E96)\n");
   printf("    -r resistors: CSV file with list of custom resistances (NOT IMPLEMENTED)\n");
+  printf("    -t top: Fix R1 and calculate R2\n");
+  printf("    -b bottom: Fix R2 and calculate R1\n");
   printf("    -v verbose: print all candidate dividers\n");
+  printf("    -g greater: Actual Vout must be greater than or equal to vout parameter\n");
+  printf("    -l less: Actual Vout must be less than or equal to vout parameter\n");
 }
 
 int main(int argc, char *argv[])
@@ -170,20 +165,20 @@ int main(int argc, char *argv[])
   int num_results = 1;
   struct res_calc *results;
 
-  while ((o = getopt(argc, argv, "vi:o:s:r:t:b:n:")) != -1)
+  while ((o = getopt(argc, argv, "vgli:o:s:r:t:b:n:")) != -1)
     switch (o)
     {
       case 'i':
         vin = atof(optarg);
-        optflag |= (1 << 0);
+        optflag |= (1 << RES_OPT_INPUT);
         break;
       case 'o':
         vout = atof(optarg);
-        optflag |= (1 << 1);
+        optflag |= (1 << RES_OPT_OUTPUT);
         break;
       case 's':
         series = optarg;
-        optflag |= (1 << 2);
+        optflag |= (1 << RES_OPT_SERIES);
         break;
       case 't':
         c.r1 = atoi(optarg);
@@ -196,10 +191,15 @@ int main(int argc, char *argv[])
       case 'n':
         num_results = atoi(optarg);
         break;
+      case 'g':
+        optflag |= (1 << RES_OPT_GREATER);
+        break;
+      case 'l':
+        optflag |= (1 << RES_OPT_LESS);
       case 'r':
         break;
       case 'v':
-        optflag |= (1 << 3);
+        optflag |= (1 << RES_OPT_VERBOSE);
         break;
       case '?':
         print_usage();
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
   double error;
   double out_actual;
 
-  if ((optflag & 3) != 3) {
+  if ((optflag & ((1 << RES_OPT_INPUT) | (1 << RES_OPT_OUTPUT))) != ((1 << RES_OPT_INPUT) | (1 << RES_OPT_OUTPUT))) {
     print_usage();
     return 3;
   }
