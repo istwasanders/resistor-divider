@@ -18,18 +18,14 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
   double norm_target;
   int r1, r2;
   int r_target;
-  int r_c[2];
-  int r_n[2];
 
   int* resistor_list = stdres_lists[list_num];
   int list_length = stdres_list_lengths[list_num];
 
-  ratio = vi / vo - 1;
-  norm_constant = (int)floor(log10(ratio));
-  norm_target = ratio / pow(10, norm_constant);
+  ratio = vi / vo;
+  norm_constant = (int)floor(log10(ratio - 1));
+  norm_target = (ratio - 1) / pow(10, norm_constant);
 
-  r_n[0] = 100;
-  r_n[1] = 100;
   if((results[0].r1 == 0) && (results[0].r2 == 0)){
     for(int i = 0; i < num_results+1; i++){
       // Is it safe to assume this as an upper bound?
