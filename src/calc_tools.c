@@ -44,3 +44,8 @@ void resistor_percolate(struct res_calc *divider_list, int list_len){
         list_len--;
     }
 }
+
+void div_output_error(double vi, double vo, struct res_calc *divider){
+    divider->out = vi * (divider->r2) / (divider->r2 + divider->r1);
+    divider->error = (divider->out / vo) - 1;
+}

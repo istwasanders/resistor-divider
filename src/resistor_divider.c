@@ -12,6 +12,7 @@
 #include "calc_tools.h"
 #include "resistor_calculator.h"
 
+// This function assumes vo is less than half of vi
 void calc(double vi, double vo, int list_num, int optflag, struct res_calc *results, int num_results){
   int r1, r2;
   int r_target;
@@ -25,6 +26,8 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
   int correction = (int)pow(10.0,abs(norm_constant));
   int correction_temp;
 
+  struct res_calc *divider = &(results[num_results]);
+
   if((results[0].r1 == 0) && (results[0].r2 == 0)){
     for(int i = 0; i < num_results+1; i++){
       // Is it safe to assume this as an upper bound?
@@ -32,48 +35,49 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
       results[i].factor = norm_constant;
     }
     for(int i = 0; i < list_length; i++){
-      r2 = results[num_results].r2 = resistor_list[i];
-
+      divider->r2 = resistor_list[i];
       // Find the optimal r1 from the list given the current r2
-      int r1_target = (int)(results[num_results].r2 * norm_target);
+      int r1_target = (int)(divider->r2 * norm_target);
       if(r1_target >= 1000) r1_target = r1_target / 10;
       int r1_target_index = target_index(r1_target, resistor_list, list_length);
 
       // Optimal r1 will be either this index or the next index
       // (Or the first index if "this index" is the last index)
       // Percolate them both into the list
-      r1 = results[num_results].r1 = resistor_list[r1_target_index];
+      divider->r1 = resistor_list[r1_target_index];
       
-      if(results[num_results].r1 < results[num_results].r2) correction_temp = correction*10;
+      if(divider->r1 < divider->r2) correction_temp = correction*10;
       else correction_temp = correction;
 
-      if(results[num_results].factor < 0) results[num_results].r2 *= correction_temp;
-      else results[num_results].r1 *= correction_temp;
+      if(divider->factor < 0) divider->r2 *= correction_temp;
+      else divider->r1 *= correction_temp;
 
-      results[num_results].out = vi*(results[num_results].r2)/
-        (results[num_results].r2 + results[num_results].r1);
-      
-      results[num_results].error = (results[num_results].out/vo)-1;
-      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (results[num_results].error <= 0) || 
-         ((optflag & (1 << RES_OPT_LESS)) == 0) && (results[num_results].error >= 0) )
+      div_output_error(vi,vo,divider);
+
+      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (divider->error <= 0) || 
+         ((optflag & (1 << RES_OPT_LESS)) == 0) && (divider->error >= 0) )
           resistor_percolate(results,num_results);
 
-      results[num_results].r2 = resistor_list[i];
-      results[num_results].r1 = resistor_list[(r1_target_index + 1) % list_length];
-      if(results[num_results].r1 < results[num_results].r2) correction_temp = correction*10;
+      divider->r2 = resistor_list[i];
+      divider->r1 = resistor_list[(r1_target_index + 1) % list_length];
+      if(divider->r1 < divider->r2) correction_temp = correction*10;
       else correction_temp = correction;
 
-      if(results[num_results].factor < 0) results[num_results].r2 *= correction_temp;
-      else results[num_results].r1 *= correction_temp;
+      if(divider->factor < 0) divider->r2 *= correction_temp;
+      else divider->r1 *= correction_temp;
 
-      results[num_results].out = vi*(results[num_results].r2)/
-        (results[num_results].r2 + results[num_results].r1);
-      
-      results[num_results].error = (results[num_results].out/vo)-1;
-      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (results[num_results].error <= 0) || 
-         ((optflag & (1 << RES_OPT_LESS)) == 0) && (results[num_results].error >= 0) )
+      div_output_error(vi,vo,divider);
+
+      if(((optflag & (1 << RES_OPT_GREATER)) == 0) && (divider->error <= 0) || 
+         ((optflag & (1 << RES_OPT_LESS)) == 0) && (divider->error >= 0) )
           resistor_percolate(results,num_results);
     }
+        // if (c.r1 < c.r2) c.factor = c.factor + 1;
+    // correction = (int)pow(10.0, abs(c.factor));
+    // if (c.factor < 0) c.r2 = c.r2 * correction;
+    // else c.r1 = c.r1 * correction;
+    // out_actual = (vin * c.r2) / ((c.r1 + c.r2));
+    // error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
   }
   else if(results[0].r1 == 0){
     float r1_temp = ((vi/vo) - 1)*results[0].r2;
@@ -84,6 +88,8 @@ void calc(double vi, double vo, int list_num, int optflag, struct res_calc *resu
     results[0].factor = 0;
   }
   else if(results[0].r2 == 0){
+
+    calc(vi, vi-vo, list_num,optflag,results,num_results);
     r1 = results[0].r1;
     while(r1 >= 1000) r1 = r1 / 10;
     while(r1 < 100) r1 = r1 * 10;
@@ -165,6 +171,8 @@ int main(int argc, char *argv[])
   int num_results = 1;
   struct res_calc *results;
 
+  c.r1 = c.r2 = 0;
+
   while ((o = getopt(argc, argv, "vgli:o:s:r:t:b:n:")) != -1)
     switch (o)
     {
@@ -216,7 +224,15 @@ int main(int argc, char *argv[])
     return 3;
   }
 
-  results = malloc((num_results + 1) * sizeof(struct res_calc));
+  if((c.r1 | c.r2) == 0){
+    results = malloc((num_results + 1) * sizeof(struct res_calc));
+    results[0] = c;
+  }
+  else{
+    results = &c;
+    num_results = 1;
+  }
+  
   if(results == NULL){
     perror("allocating results");
     return -1;
@@ -231,17 +247,24 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  calc(vin,vout,series_index,optflag,results,num_results);
   printf("%s,%s,%s,%s\n","R1","R2","Actual Out","Error");
-  for(int i = 0; i < num_results; i++){
-    c = results[i];
-    // if (c.r1 < c.r2) c.factor = c.factor + 1;
-    // correction = (int)pow(10.0, abs(c.factor));
-    // if (c.factor < 0) c.r2 = c.r2 * correction;
-    // else c.r1 = c.r1 * correction;
-    // out_actual = (vin * c.r2) / ((c.r1 + c.r2));
-    // error = (vin * c.r2) / ((c.r1 + c.r2) * vout) - 1;
-    printf("%d,%d,%.5f,%.5f%%\n",c.r1,c.r2,c.out,c.error*100);
+  
+  // If vout is less than half of vin, do normal calculations
+  if(vin > vout*2){
+    calc(vin,vout,series_index,optflag,results,num_results);
+    for(int i = 0; i < num_results; i++){
+      c = results[i];
+      printf("%d,%d,%.5f,%.5f%%\n",c.r1,c.r2,c.out,c.error*100);
+    }
   }
+  // Otherwise calculate as if the desired output were vin-vout and flip r1 and r2
+  else {
+    calc(vin,vin-vout,series_index,optflag,results,num_results);
+    for(int i = 0; i < num_results; i++){
+      c = results[i];
+      printf("%d,%d,%.5f,%.5f%%\n",c.r2,c.r1,vin-c.out,((vin-c.out)/(vout)-1)*100);
+    }
+  }
+  
   return 0;
 }
