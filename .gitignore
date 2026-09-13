@@ -36,7 +36,6 @@
 *.x86_64
 *.hex
 bin/
-*~
 
 # Debug files
 *.dSYM/
@@ -55,3 +54,6 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+*~
+*.swp
